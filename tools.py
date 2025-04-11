@@ -2,6 +2,8 @@
 import bpy
 import math
 import mathutils
+import bmesh
+
 
 def apply_boolean_cut(base_object, cutting_object, operation='DIFFERENCE'):
     """
@@ -89,18 +91,20 @@ def apply_array_modifier(
     # Add an Array Modifier
     array_modifier = base_object.modifiers.new(name=f"Array_{axis}", type='ARRAY')
     array_modifier.count = count
-    array_modifier.use_relative_offset = True
+    array_modifier.use_relative_offset = False
+    array_modifier.use_constant_offset = True
 
     # Reset offsets to zero for all axes
-    array_modifier.relative_offset_displace = [0, 0, 0]
+    array_modifier.constant_offset_displace = [0, 0, 0]
 
+    
     # Set spacing for the specified axis
     if axis.upper() == "X":
-        array_modifier.relative_offset_displace[0] = spacing
+        array_modifier.constant_offset_displace[0] = spacing
     elif axis.upper() == "Y":
-        array_modifier.relative_offset_displace[1] = spacing
+        array_modifier.constant_offset_displace[1] = spacing
     elif axis.upper() == "Z":
-        array_modifier.relative_offset_displace[2] = spacing
+        array_modifier.constant_offset_displace[2] = spacing
     else:
         print(f'Invalid dimension {axis}, returning.')
 
@@ -192,33 +196,100 @@ def duplicate_object(obj, offset=(0, 0, 0)):
     print(f"Duplicated '{obj.name}' -> '{new_obj.name}' at offset {offset}")
     return new_obj
 
-######### old? ###########
+def add_sun(
+    loc = (0.0, 0.0, 120.0), 
+    direction = (0.0, 0.0, -120.0)
+):
 
-# Function to extrude the bottom faces of the cube
-def extrude_faces_down(object, distance=1.0):
-    """
-    Extrudes the bottom faces of a given object.
+    # Create a new sun lamp data block
+    sun_data = bpy.data.lights.new(name="Sun", type='SUN')
+    
+    # Create a new object with the lamp data
+    sun_object = bpy.data.objects.new(name="Sun", object_data=sun_data)
+    
+    # Link the lamp object to the current collection
+    bpy.context.collection.objects.link(sun_object)
+    
+    # Set the location of the sun lamp (optional)
+    sun_object.location = loc
+    
+    sun_object.rotation_euler = (math.radians(60), 0, math.radians(45))
 
-    :param object: The object whose bottom faces will be extruded.
-    :param distance: The distance to extrude the faces.
-    """
-    # Switch to Edit Mode to work with the mesh
-    bpy.context.view_layer.objects.active = object
+    return
+
+def set_render_engine():
+
+    # Set render engine to Cycles
+    bpy.context.scene.render.engine = 'CYCLES'
+    
+    # Set device to GPU
+    bpy.context.scene.cycles.device = 'GPU'
+    
+    # Optional: make sure GPU compute is enabled in preferences (needed in some setups)
+    # This part affects user preferences, not just the current scene
+    bpy.context.preferences.addons['cycles'].preferences.compute_device_type = 'CUDA'  # or 'OPTIX' or 'HIP' or 'METAL'
+    
+    # Enable all available devices
+    bpy.context.preferences.addons['cycles'].preferences.get_devices()
+    for device in bpy.context.preferences.addons['cycles'].preferences.devices:
+        device.use = True
+
+
+def bevel_top_bottom_faces(
+    obj, 
+    bevel_width=0.1, 
+    segments=3,
+    profile=0.1,
+):
+    # Ensure we're in object mode and select the object
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+
+    # Switch to edit mode
     bpy.ops.object.mode_set(mode='EDIT')
 
-    # Select all faces
-    bpy.ops.mesh.select_all(action='SELECT')
+    # Create a BMesh from the object
+    bm = bmesh.from_edit_mesh(obj.data)
+    bm.normal_update()
 
-    # Switch to face selection mode
-    bpy.ops.mesh.select_mode(type='FACE')
+    # Deselect everything
+    for f in bm.faces:
+        f.select = False
 
-    # Select bottom faces
-    bpy.ops.mesh.select_all(action='SELECT')
-    bpy.ops.transform.translate(value=(0, 0, -1))  # Move all selected faces downward
+    # Get bounding box Z values
+    z_coords = [v.co.z for v in bm.verts]
+    min_z = min(z_coords)
+    max_z = max(z_coords)
+    threshold = 1e-5
 
-    # Extrude the selected faces (move them along the Z axis)
-    bpy.ops.mesh.extrude_region_move(TRANSFORM_OT_translate={"value":(0, 0, -distance)})
+    # Select top and bottom faces
+    top_faces = [f for f in bm.faces if all(abs(v.co.z - max_z) < threshold for v in f.verts)]
+    bottom_faces = [f for f in bm.faces if all(abs(v.co.z - min_z) < threshold for v in f.verts)]
 
-    # Return to Object Mode
+    # Collect edges from those faces
+    bevel_edges = set()
+    for f in top_faces + bottom_faces:
+        bevel_edges.update(f.edges)
+
+    # Deselect all edges first
+    for e in bm.edges:
+        e.select = False
+
+    # Select only the desired edges
+    for e in bevel_edges:
+        e.select = True
+
+    # Bevel the selected edges
+    bmesh.ops.bevel(
+        bm,
+        geom=list(bevel_edges),
+        offset=bevel_width,
+        segments=segments,
+        profile=profile,
+        affect='EDGES'
+    )
+
+    # Update and exit edit mode
+    bmesh.update_edit_mesh(obj.data)
     bpy.ops.object.mode_set(mode='OBJECT')
-

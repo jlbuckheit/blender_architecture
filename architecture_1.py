@@ -47,7 +47,7 @@ def make_arch(
 def add_columns_to_arch(
     arch_hyp,
     array_counts,
-    #radius,
+    radius,
     #depth,
     #location,
     vertices = 36,
@@ -60,7 +60,6 @@ def add_columns_to_arch(
         (2*arch_hyp['location'][2] - arch_hyp['legs_dist'])/2
     )
     depth = arch_hyp['size']*arch_hyp['scale'][2] + arch_hyp['legs_dist']
-    radius = .25
     
     bpy.ops.mesh.primitive_cylinder_add(
         radius=radius,
@@ -77,11 +76,75 @@ def add_columns_to_arch(
         counts=(2,4,1), 
         axes=('X', 'Y', 'Z'), 
         spacings=(
-            -arch_hyp['size'],
-            arch_hyp['size']*arch_hyp['scale'][1]*2,
+            -arch_hyp['size']*arch_hyp['scale'][0],
+            arch_hyp['size']*arch_hyp['scale'][1],
             1,
         )
     )
-
     
     return columns
+
+def add_capital(
+    arch_hyp,
+):    
+    location = (
+        arch_hyp['location'][0],
+        arch_hyp['location'][1] - arch_hyp['size']/2*arch_hyp['scale'][1],
+        #(2*arch_hyp['location'][2] - arch_hyp['legs_dist'])/2
+        arch_hyp['location'][2] - arch_hyp['size']*arch_hyp['scale'][2]*5/8,
+    )
+    bpy.ops.mesh.primitive_cube_add(
+        size=arch_hyp['size']/2, 
+        location=location,
+        scale=(arch_hyp['scale'][0]*2.2,
+               arch_hyp['scale'][1]*0.8,
+               arch_hyp['scale'][2]*0.5,
+              )
+    )
+    cube = bpy.context.object
+    cube.name = 'capital'
+
+    tools.bevel_top_bottom_faces(
+        cube, 
+        bevel_width=arch_hyp['size']/40, 
+        segments=3
+    )
+
+    tools.apply_array_modifiers(
+        base_object=cube, 
+        counts=(arch_hyp['counts'][0], 
+                arch_hyp['counts'][1] + 1, 
+                arch_hyp['counts'][2], 
+               ),
+        axes=('X', 'Y', 'Z'), 
+        spacings=(
+            -arch_hyp['size']*arch_hyp['scale'][0],
+            arch_hyp['size']*arch_hyp['scale'][1],
+            1,
+        )
+    )
+    
+    return cube
+
+
+def add_keystone_arch(arch_hyp):
+    arch_cut_size = arch_size/2
+    arch_cut_location = (
+        arch_location[0],
+        arch_location[1],
+        arch_location[2] - arch_size/4
+    )
+
+    arch_cut_rotation = (0, math.pi / 2, 0)
+
+    bpy.ops.mesh.primitive_cylinder_add(
+        radius=arch_cut_size/2, 
+        depth=arch_size, 
+        location=arch_cut_location,
+        vertices=arch_cut_vertices,
+        rotation=arch_cut_rotation,
+    )
+    cylinder = bpy.context.object
+    cylinder.name = 'keystone_arch'
+
+    return
