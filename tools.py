@@ -181,7 +181,7 @@ def duplicate_object(obj, offset=(0, 0, 0)):
     # Copy the object and its mesh data
     new_obj = obj.copy()
     new_obj.data = obj.data.copy()
-    new_obj.name = obj.name + "_Copy"
+    #new_obj.name = obj.name + "_Copy"
 
     # Apply offset to location
     new_obj.location = (
@@ -213,7 +213,7 @@ def add_sun(
     # Set the location of the sun lamp (optional)
     sun_object.location = loc
     
-    sun_object.rotation_euler = (math.radians(60), 0, math.radians(45))
+    sun_object.rotation_euler = (math.radians(30), 0, math.radians(45))
 
     return
 
@@ -293,3 +293,157 @@ def bevel_top_bottom_faces(
     # Update and exit edit mode
     bmesh.update_edit_mesh(obj.data)
     bpy.ops.object.mode_set(mode='OBJECT')
+
+
+def delete_faces_with_negative_z_normal(obj=None, threshold=0.0):
+    """
+    Deletes all faces from the given object that have a normal.z < threshold.
+    
+    Parameters:
+    - obj: The mesh object to operate on. If None, uses the active object.
+    - threshold: A float value to compare against the face normal's Z component.
+    """
+    if obj is None:
+        obj = bpy.context.object
+
+    if obj is None or obj.type != 'MESH':
+        print("No valid mesh object found.")
+        return
+
+    # Enter Edit Mode
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.transform_apply(rotation=True)
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    # Get BMesh and update normals
+    bm = bmesh.from_edit_mesh(obj.data)
+    bm.normal_update()
+
+    # Find faces with Z-normal less than threshold
+    faces_to_delete = [f for f in bm.faces if f.normal.z < threshold]
+
+    # Delete those faces
+    bmesh.ops.delete(bm, geom=faces_to_delete, context='FACES')
+
+    # Update the mesh and return to Object Mode
+    bmesh.update_edit_mesh(obj.data)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    #print(f"Deleted {len(faces_to_delete)} faces with normal.z < {threshold}")
+
+def extrude_faces_along_normals(obj, distance=0.1, threshold=0.3):
+    ### TODO: grabbing outer faces is janky and should be made into a tools function
+    # Get the active object
+    #obj = bpy.context.active_object
+    if obj is None or obj.type != 'MESH':
+        print("Active object is not a mesh")
+        return
+
+    # Ensure we're in object mode before switching to edit
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    # Get bmesh from the object
+    mesh = bmesh.from_edit_mesh(obj.data)
+    mesh.faces.ensure_lookup_table()
+
+    # Select all faces
+    for face in mesh.faces:
+        face.select = True
+
+    bpy.ops.mesh.extrude_region_shrink_fatten(MESH_OT_extrude_region={"use_normal_flip":False, "use_dissolve_ortho_edges":False, "mirror":False}, 
+                                              TRANSFORM_OT_shrink_fatten={
+                                                  "value":-distance, "use_even_offset":False, "mirror":False, 
+                                                  "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', 
+                                                  "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, 
+                                                  "snap":False, "release_confirm":False, "use_accurate":False
+                                              })
+    
+    ###
+    ###
+    select_outer_faces_facing_up()
+                                 
+    bpy.ops.mesh.extrude_region_shrink_fatten(MESH_OT_extrude_region={"use_normal_flip":False, "use_dissolve_ortho_edges":True, "mirror":False}, 
+                                              TRANSFORM_OT_shrink_fatten={
+                                                  "value":-distance, "use_even_offset":False, "mirror":False, 
+                                                  "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', 
+                                                  "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, 
+                                                  "snap":False, "release_confirm":False, "use_accurate":False
+                                              })
+
+    #print(f"Extruded all faces along normals by {distance} units")
+
+
+def select_outer_faces_facing_up(z_thresh=0.01, flat_thresh=0.01, y_thresh=0.9999999999):
+    obj = bpy.context.active_object
+    if obj is None or obj.type != 'MESH':
+        print("Select a mesh object.")
+        return
+
+    bpy.ops.object.mode_set(mode='EDIT')
+    bm = bmesh.from_edit_mesh(obj.data)
+    bm.faces.ensure_lookup_table()
+
+    # Clear selection
+    for face in bm.faces:
+        face.select = False
+
+    # Normal transformation: object space → world space
+    normal_matrix = obj.matrix_world.to_3x3().inverted().transposed()
+
+    for face in bm.faces:
+        world_normal = normal_matrix @ face.normal
+        world_normal.normalize()
+
+        # Select if the face is mostly facing upward (positive Z), but not perfectly vertical or flat
+        if world_normal.z < z_thresh and abs(world_normal.z) > flat_thresh:
+            face.select = True
+        if abs(world_normal.y) > 0.9999999999:
+            face.select = True
+
+    bmesh.update_edit_mesh(obj.data, loop_triangles=True)
+    print("Selection complete.")
+
+def extrude_downward_faces_excluding_keystone(obj=None, z_thresh=0.9, keystone_ratio=0.5, distance=1.0):
+    ### TODO: z_thresh should be a function of how many vertices (stones) in arch
+    if obj is None:
+        obj = bpy.context.object
+
+    if not obj or obj.type != 'MESH':
+        print("No valid mesh object selected.")
+        return
+
+    # Ensure Object Mode and apply rotation
+    if bpy.context.mode != 'OBJECT':
+        bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.transform_apply(rotation=True)
+
+    # Calculate bounding box height
+    z_coords = [obj.matrix_world @ mathutils.Vector(corner) for corner in obj.bound_box]
+    min_z = min(v.z for v in z_coords)
+    max_z = max(v.z for v in z_coords)
+    height = max_z - min_z
+    keystone_z_limit = max_z - (height * keystone_ratio)
+    
+    # Switch to Edit Mode and get BMesh
+    bpy.ops.object.mode_set(mode='EDIT')
+    bm = bmesh.from_edit_mesh(obj.data)
+    bm.faces.ensure_lookup_table()
+
+    # Deselect everything first
+    for f in bm.faces:
+        f.select = False
+
+    # Select faces that face downward, excluding those near the top
+    for f in bm.faces:
+        world_center = obj.matrix_world @ f.calc_center_median()
+        if f.normal.z > z_thresh and world_center.z < keystone_z_limit:
+            f.select = True
+
+    # Update selection
+    bmesh.update_edit_mesh(obj.data)
+    bpy.ops.mesh.extrude_region_move(TRANSFORM_OT_translate={"value":(0, 0, -distance)})
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    print("Selected downward-facing faces, excluding keystone region.")
