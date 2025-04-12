@@ -2,10 +2,13 @@
 import bpy
 import importlib
 
-import tools
+from utils import tools, face_utils
 import architecture_1
+import textures
 importlib.reload(tools)
+importlib.reload(face_utils)
 importlib.reload(architecture_1)
+importlib.reload(textures)
 
 ### TODO:
 # - add brick texture
@@ -14,27 +17,56 @@ importlib.reload(architecture_1)
 # - landscape generator
 # - refactor
 
-# Delete all existing objects to start fresh
-#bpy.ops.object.mode_set(mode='OBJECT')
-bpy.ops.object.select_all(action='SELECT')
-bpy.ops.object.delete()
 
 def generate():
+    # Delete all existing objects to start fresh
+    bpy.ops.object.select_all(action='SELECT')
+    bpy.ops.object.delete()
+    tools.delete_materials_except_base()
+    
     ### hyp
     structure_center = (0,0,0)
     arch_config = {
         'size': 4,
-        'location': (6.5, -3.0, 4.0),
+        'location': (12.0, -9.0, 4.0), #(6.5, -3.0, 4.0)
         'scale': (0.5, 0.75, 0.5),
         'cut_vertices': 72,
         'legs_dist': 3,
         'counts': (1,7,1),
+        'vault': False,
     }
 
     tools.set_render_engine()
     tools.add_sun()
 
     arch_east = architecture_1.make_arch(arch_config)
+
+    #acs = 6
+    #ac_xs = 0.75
+    #acly = abs(acs - (arch_config['size']*ac_xs) + ac_xs) + abs(arch_config['location'][1])
+    #acly = abs(0.5*acs + 0.5*arch_config['size'] + 2*ac_xs -2) + abs(arch_config['location'][1])
+    arch_corner_config = {
+        'size': 6,
+        'location': (12.0, -12.75, 6.0), #(6.5, -6.75, 6.0)
+        'scale': (0.75, 0.75, 0.5),
+        'cut_vertices': 72,
+        'legs_dist': 4.5,
+        'counts': (1,1,1),
+        'vault': True,
+    }
+    arch_corner = architecture_1.make_arch(arch_corner_config)
+    bpy.ops.mesh.primitive_cube_add(
+        size=arch_corner_config['size']*0.5, 
+        location=(
+            arch_corner_config['location'][0],
+            arch_corner_config['location'][1],
+            arch_corner_config['location'][2] - arch_corner_config['size']*0.25,
+        ),
+        scale=(1,1,1)
+    )
+    corner_tower = bpy.context.object
+    face_utils.extrude_bottom_faces(corner_tower, distance=arch_corner_config['legs_dist'] - arch_corner_config['size']*0.25)
+    tools.join_objects([arch_corner, corner_tower])
 
     tools.apply_array_modifiers(
         base_object=arch_east, 
@@ -58,8 +90,8 @@ def generate():
         arch_config,
     )
     tools.join_objects([arch_east, capitals])
+    tools.join_objects([arch_east, arch_corner])
 
-    return
     arch_east = tools.duplicate_object(arch_east)
     tools.rotate_around_point(arch_east, angle_deg=90)
     arch_north = tools.duplicate_object(arch_east)

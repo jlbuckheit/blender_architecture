@@ -1,6 +1,6 @@
 
 import bpy
-import tools
+from utils import tools, face_utils
 import math
 
 
@@ -39,12 +39,17 @@ def make_arch(
     cylinder = bpy.context.object
     cylinder.name = 'arch_cut'
     
-    tools.apply_boolean_cut(cube, cylinder)
+    if arch_config['vault']:
+        tools.apply_boolean_cut(cube, cylinder, delete = False)
+        tools.rotate_around_point(cylinder, point=arch_cut_location)
+        tools.apply_boolean_cut(cube, cylinder)
+    else:
+        tools.apply_boolean_cut(cube, cylinder)
 
-    tools.extrude_bottom_faces(cube, distance=arch_config['legs_dist'])
+    face_utils.extrude_bottom_faces(cube, distance=arch_config['legs_dist'])
     
     return cube
-
+    
 def add_columns_to_arch(
     arch_config,
     #array_counts,
@@ -105,7 +110,7 @@ def add_capital(
     cube = bpy.context.object
     cube.name = 'capital'
 
-    tools.bevel_top_bottom_faces(
+    face_utils.bevel_top_bottom_faces(
         cube, 
         bevel_width=arch_config['size']/40, 
         segments=3
@@ -158,10 +163,10 @@ def add_keystone_arch(
     cylinder = bpy.context.object
     cylinder.name = 'keystone_arch'
 
-    tools.delete_faces_with_negative_z_normal(cylinder)
-    tools.extrude_faces_along_normals(cylinder, distance=arch_config['size']*0.02)
-    tools.extrude_downward_faces_excluding_keystone(cylinder, distance=arch_config['size']*0.05) 
-
+    face_utils.delete_faces_with_negative_z_normal(cylinder)
+    face_utils.extrude_faces_along_normals(cylinder, distance=arch_config['size']*0.02)
+    face_utils.extrude_downward_faces_excluding_keystone(cylinder, distance=arch_config['size']*0.05) 
+    
     tools.apply_array_modifiers(
         base_object=cylinder, 
         counts=(arch_config['counts'][0]+1,arch_config['counts'][1],arch_config['counts'][2]), 
@@ -172,7 +177,8 @@ def add_keystone_arch(
             1,
         )
     )
-
-    
     
     return cylinder
+
+
+    
