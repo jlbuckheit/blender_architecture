@@ -267,3 +267,41 @@ def extrude_downward_faces_excluding_keystone(obj=None, z_thresh=0.9, keystone_r
 
     print("Selected downward-facing faces, excluding keystone region.")
 
+
+def inset_all_faces(obj, thickness=0.1, depth=0.0, use_individual=False):
+    """
+    Insets all faces of a mesh object.
+
+    :param obj: The Blender object to modify (must be a mesh)
+    :param thickness: The inset thickness
+    :param depth: Extrusion depth along normals after inset
+    :param use_individual: Whether to inset faces individually
+    """
+    if obj.type != 'MESH':
+        print(f"Object {obj.name} is not a mesh.")
+        return
+
+    # Set object as active and go to edit mode
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    # Work with BMesh
+    bm = bmesh.from_edit_mesh(obj.data)
+    bm.faces.ensure_lookup_table()
+
+    # Select all faces
+    for face in bm.faces:
+        face.select = True
+
+    bmesh.update_edit_mesh(obj.data)
+
+    # Inset faces
+    bpy.ops.mesh.inset(
+        thickness=thickness,
+        depth=depth,
+        use_individual=use_individual
+    )
+
+    # Update mesh and return to object mode
+    bpy.ops.object.mode_set(mode='OBJECT')
+

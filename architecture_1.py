@@ -47,7 +47,7 @@ def make_arch(
         tools.apply_boolean_cut(cube, cylinder)
 
     face_utils.extrude_bottom_faces(cube, distance=arch_config['legs_dist'])
-    
+
     return cube
     
 def add_columns_to_arch(
@@ -165,7 +165,8 @@ def add_keystone_arch(
 
     face_utils.delete_faces_with_negative_z_normal(cylinder)
     face_utils.extrude_faces_along_normals(cylinder, distance=arch_config['size']*0.02)
-    face_utils.extrude_downward_faces_excluding_keystone(cylinder, distance=arch_config['size']*0.05) 
+    face_utils.extrude_downward_faces_excluding_keystone(cylinder, distance=arch_config['size']*0.05)
+    face_utils.inset_all_faces(cylinder, thickness=0.01, depth=-0.01, use_individual=True)
     
     tools.apply_array_modifiers(
         base_object=cylinder, 
