@@ -163,7 +163,7 @@ def duplicate_object(obj, offset=(0, 0, 0)):
     return new_obj
 
 def add_sun(
-    loc = (0.0, 0.0, 120.0), 
+    loc = (0.0, 0.0, 512.0), 
     direction = (0.0, 0.0, -120.0)
 ):
 
@@ -179,7 +179,7 @@ def add_sun(
     # Set the location of the sun lamp (optional)
     sun_object.location = loc
     
-    sun_object.rotation_euler = (math.radians(30), 0, math.radians(45))
+    sun_object.rotation_euler = (math.radians(60), 0, math.radians(45))
 
     return
 
@@ -206,3 +206,16 @@ def delete_materials_except_base(base_name="Material"):
             bpy.data.materials.remove(mat)
             print(f"Material deleted: {mat}")
 
+def object_exists(object_name):
+    for obj in bpy.context.scene.objects:
+        if obj.name == object_name:
+            return True
+    return False
+
+def delete_all_except(exceptions):
+    bpy.ops.object.select_all(action='SELECT')
+    for obj in bpy.context.scene.objects:
+        if obj.name in exceptions:
+            bpy.data.objects[obj.name].select_set(False)
+    bpy.ops.object.delete()
+    return

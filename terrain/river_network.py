@@ -191,8 +191,11 @@ def main(
     evaporation_rate = 0.2,
     remove_lakes_arg = True,
     output_path = 'river_network',
+    seed = None,
     ):
 
+    if seed:
+        np.random.seed(seed)
     shape = (dim,) * 2
     print ('Generating...')
   
@@ -201,13 +204,14 @@ def main(
         land_mask = remove_lakes((util.fbm(shape, -2, lower=2.0) + bump(shape, 0.2 * dim) - 1.1) > 0)
     else:
         land_mask = (util.fbm(shape, -2, lower=2.0) + bump(shape, 0.2 * dim) - 1.1) > 0
+
     coastal_dropoff = np.tanh(util.dist_to_mask(land_mask) / 80.0) * land_mask
     mountain_shapes = util.fbm(shape, -2, lower=2.0, upper=np.inf)
     initial_height = ( 
         (util.gaussian_blur(np.maximum(mountain_shapes - 0.40, 0.0), sigma=5.0) 
           + 0.1) * coastal_dropoff)
     deltas = util.normalize(np.abs(util.gaussian_gradient(initial_height))) 
-  
+    
     print('  ...sampling points')
     points = util.poisson_disc_sampling(shape, disc_radius)
     coords = np.floor(points).astype(int)
@@ -233,8 +237,9 @@ def main(
         points, neighbors, points_deltas, volume, upstream, 
         max_delta, river_downcutting_constant)
     terrain_height = render_triangulation(shape, tri, new_height)
-  
-    np.savez('river_network', height=terrain_height, land_mask=land_mask)
+    
+    np.savez(output_path, height=terrain_height, land_mask=land_mask)
+    return terrain_height
 
 
 if __name__ == '__main__':

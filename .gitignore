@@ -1,0 +1,9 @@
+*.ipynb_checkpoints
+*__pycache__
+*.npy
+*.npz
+*.blend
+*.blend1
+*.png
+old.py
+ws.ipynb
