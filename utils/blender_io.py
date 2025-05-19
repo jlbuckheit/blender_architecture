@@ -5,19 +5,50 @@ from PIL import Image
 import os
 import tempfile
 
+def load_npy_chunk(npy_dir, key="height", y_range=(0, 100), x_range=(0, 100)):
+    """
+    Loads a chunk from a .npy file stored in a directory (exported from .npz) using memory mapping.
+
+    Args:
+        npy_dir (str): Path to the directory containing .npy files.
+        key (str): Which array to load, e.g. "height" or "river".
+        y_range (tuple): (start_row, end_row) to load.
+        x_range (tuple): (start_col, end_col) to load.
+
+    Returns:
+        chunk (ndarray): Sliced 2D array chunk.
+    """
+    npy_path = os.path.join(npy_dir, f"{key}.npy")
+    if not os.path.isfile(npy_path):
+        raise FileNotFoundError(f"Expected file not found: {npy_path}")
+
+    arr = np.load(npy_path, mmap_mode='r')
+    chunk = arr[y_range[0]:y_range[1], x_range[0]:x_range[1]]
+    return chunk
+
 def load_npz_terrain_with_river_displace(npz_path, name="Terrain", scale_xy=0.1, scale_z=1.0,
-                                         displace_strength=100.0, use_uv=False):
+                                         displace_strength=100.0, use_uv=False,
+                                         chunk_range = [], npy_path = None):
     """
     Loads a .npz terrain file with 'height' and optionally 'river', creates a mesh in Blender,
     and applies a displace modifier based on river intensity.
     """
     # Load data
-    data = np.load(npz_path)
-    if "height" not in data:
-        raise KeyError("The .npz file must contain a 'height' array.")
+    if chunk_range: ### TODO this does not work
+        height = load_npy_chunk(
+            npy_path, 
+            key="height",
+            y_range=(chunk_range[2], chunk_range[3]), 
+            x_range=(chunk_range[0], chunk_range[1]),
+        )
+        river = None ### TODO
+    else:
+        data = np.load(npz_path)
+        if "height" not in data:
+            raise KeyError("The .npz file must contain a 'height' array.")
 
-    height = data["height"]
-    river = data.get("river")  # Optional
+        height = data["height"]
+        river = data.get("river")  # Optional
 
     n_rows, n_cols = height.shape
     verts = []

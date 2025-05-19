@@ -2,11 +2,19 @@
 import bpy
 import os
 import importlib
+
+#import sys
+#current_dir = os.path.dirname(os.path.abspath(__file__))
+# Add the parent directory (assuming your package is there)
+#package_dir = os.path.join(current_dir, '..')
+#sys.path.append(package_dir)
+#print(package_dir)
+
 import river_network
 importlib.reload(river_network)
 
-import sys
-sys.path.append("C:/Users/jlbuc/my_python/repos/blender_architecture/utils")
+
+#sys.path.append("C:/Users/jlbuc/my_python/repos/blender_architecture/utils")
 from utils import tools, face_utils, blender_io
 importlib.reload(tools)
 importlib.reload(face_utils)
@@ -57,6 +65,8 @@ def get_landscape(water_offset):
         scale_xy=terrain_config['scale_xy'], 
         scale_z=terrain_config['scale_z'],
         displace_strength=terrain_config['displace_strength'],
+        #chunk_range = [0,0,256,256],### TODO: this does not work
+        #npy_path = './river_network_42_1024_npy'
     )
     landscape.location = (-dim*scale_xy/2, dim*scale_xy/2, water_offset)
     return landscape

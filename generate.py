@@ -7,8 +7,9 @@ from utils import tools, face_utils, blender_io
 import architecture_1
 import textures
 #import landscape
-#from terrain import river_network
+from terrain import river_network
 from terrain import general
+import boat
 importlib.reload(tools)
 importlib.reload(face_utils)
 importlib.reload(blender_io)
@@ -17,18 +18,26 @@ importlib.reload(textures)
 #importlib.reload(landscape)
 #importlib.reload(river_network)
 importlib.reload(general)
+importlib.reload(boat)
 
 ### TODO:
 # - add brick texture
 # - figure out how to make keystone z_thresh a function of vertices (stones)
 # - dome/folia generator
 # - landscape logic:
+### - load in subset of landscape for speed
 ### - function to get edge intersection of land/water
 ### - function to randomly select some subset
 ### - place structures along subset
 ### - function to randomly select landscape vertex above water
 ### - make pedestal/stairs, the bottom face of which is below landscape
 # - refactor
+
+
+
+
+
+
 
 
 def generate():
@@ -46,6 +55,30 @@ def generate():
     if 'landscape' not in obj_exceptions:
         landscape = general.get_landscape(water_offset)
     water = general.get_ocean()
+
+    # Make the object active
+    #tools.select_apply_scale_deselect('landscape')
+    
+    #source = bpy.context.scene.objects['landscape']
+    #target = bpy.context.scene.objects['water']
+
+    boat.make_boat()
+    
+    #coast_edges, coast_midpoint = tools.select_n_intersecting_edges(source, target, n=10)
+    #coast_edges = tools.select_n_intersecting_edges(source, target, n=10)
+    #print(coast_edges)
+    return
+
+    tools.deselect_all_and_object_mode()
+    
+    bpy.ops.mesh.primitive_cylinder_add(
+        radius=100, 
+        depth=100, 
+        location=coast_midpoint,
+        vertices=72,
+        rotation=(0,0,0),
+    )
+
 
     ### hyp
     structure_center = (0,0,0)
